@@ -61,7 +61,7 @@ st.markdown(
     }
 
     .metric-value {
-        font-size: 2.2rem;
+        font-size: 2.5rem;
         font-weight: 800;
         color: #38bdf8;
         line-height: 1.1;
@@ -230,6 +230,15 @@ max_gallons = float(df_tanque["gallons"].max())
 # Cargar Equipos desde Supabase
 df_equipos = obtener_equipos()
 
+# Diccionario de Fracciones para Selección Rápida
+FRACCIONES_DICT = {
+    "0 (Exacto)": 0.0,
+    "1/16": 1/16, "1/8": 1/8, "3/16": 3/16, "1/4": 1/4,
+    "5/16": 5/16, "3/8": 3/8, "7/16": 7/16, "1/2": 1/2,
+    "9/16": 9/16, "5/8": 5/8, "11/16": 11/16, "3/4": 3/4,
+    "13/16": 13/16, "7/8": 7/8, "15/16": 15/16
+}
+
 # ==========================================
 # HEADER
 # ==========================================
@@ -250,77 +259,102 @@ st.markdown(
 tab1, tab2, tab3 = st.tabs(["📏 Cubaje de Tanque", "⛽ Registrar Fuleo (Nube)", "🚛 Gestión de Flota"])
 
 # ==========================================
-# PESTAÑA 1: CUBAJE DE TANQUE (ESTRUCTURA Y DISEÑO ANTERIOR)
+# PESTAÑA 1: CUBAJE CON DISEÑO TRADICIONAL DE PULGADAS
 # ==========================================
 with tab1:
     modo = st.radio(
-        "Seleccione Dirección de Cálculo:",
+        "Modo de Operación:",
         ["Pulgadas ➔ Galones", "Galones ➔ Pulgadas"],
         horizontal=True,
-        key="modo_cubaje_prev"
+        key="modo_cubaje_design"
     )
 
     st.markdown("---")
-    col_inputs, col_results = st.columns([1, 1], gap="large")
+    col_inputs, col_results = st.columns([1.1, 0.9], gap="large")
 
     if modo == "Pulgadas ➔ Galones":
         with col_inputs:
-            st.markdown("### 📥 Entrada de Nivel")
-            
-            # Control interactivo doble: Slider + Numeric Input
-            val_in = st.slider(
-                "Nivel en Tanque (Pulgadas):",
+            st.markdown("### 📐 Selección de Medición (Varilla)")
+
+            # Fila de Pulgadas Enteras + Fracciones
+            col_ent, col_frac = st.columns(2)
+            with col_ent:
+                pulgadas_enteras = st.number_input(
+                    "Pulgadas Enteras:",
+                    min_value=0,
+                    max_value=int(max_inches),
+                    value=44,
+                    step=1,
+                    key="pulgadas_enteras_inp"
+                )
+            with col_frac:
+                frac_str = st.selectbox(
+                    "Fracción de Pulgada:",
+                    list(FRACCIONES_DICT.keys()),
+                    index=7, # Por defecto 3/8
+                    key="fraccion_inp"
+                )
+
+            # Cálculo de la suma decimal
+            pulgadas_totales = pulgadas_enteras + FRACCIONES_DICT[frac_str]
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            # Slider complementario para ajuste rápido/visual
+            nivel_final_in = st.slider(
+                "Ajuste Deslizante Fino (Pulgadas Decimales):",
                 min_value=0.0,
                 max_value=max_inches,
-                value=44.375,
+                value=float(pulgadas_totales),
                 step=0.0625,
-                key="slider_in_prev"
+                key="slider_pulgadas_fino"
             )
 
-            val_in_exact = st.number_input(
-                "Ajuste Preciso (Pulgadas Decimal):",
-                min_value=0.0,
-                max_value=max_inches,
-                value=float(val_in),
-                step=0.001,
-                format="%.3f",
-                key="num_in_prev"
-            )
-
-            nivel_final_in = val_in_exact
             galones_calc = float(f_gal_quad(nivel_final_in))
             porcentaje = (galones_calc / max_gallons) * 100
 
         with col_results:
             st.markdown("### 📊 Resultado de Cubaje")
-            
+
             st.markdown(
                 f"""
                 <div class="metric-card">
-                    <div class="metric-label">Volumen Disponible Calculado</div>
-                    <div class="metric-value">{galones_calc:,.2f} GAL</div>
-                    <div class="metric-sub">Capacidad Ocupada: {porcentaje:.1f}% del Total ({max_gallons:,.0f} GAL)</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown(
-                f"""
-                <div class="metric-card">
-                    <div class="metric-label">Espacio Vacío (Ullage)</div>
-                    <div class="metric-value" style="color: #f43f5e;">{max_gallons - galones_calc:,.2f} GAL</div>
-                    <div class="metric-sub">Pulgadas Restantes: {max_inches - nivel_final_in:.3f}"</div>
+                    <div class="metric-label">Lectura Seleccionada</div>
+                    <div class="metric-value" style="color: #818cf8;">{nivel_final_in:.3f}"</div>
+                    <div class="metric-sub">Pulgadas Enteras + Fracción</div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
-        # Gráfica interactiva del tanque
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            st.markdown(
+                f"""
+                <div class="metric-card">
+                    <div class="metric-label">Volumen Disponible Calculado</div>
+                    <div class="metric-value">{galones_calc:,.2f} GAL</div>
+                    <div class="metric-sub">Ocupación del Tanque: {porcentaje:.1f}% ({max_gallons:,.0f} GAL Total)</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            st.markdown(
+                f"""
+                <div class="metric-card">
+                    <div class="metric-label">Espacio Vacío (Ullage)</div>
+                    <div class="metric-value" style="color: #f43f5e;">{max_gallons - galones_calc:,.2f} GAL</div>
+                    <div class="metric-sub">Faltante para llenar: {max_inches - nivel_final_in:.3f}"</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        # Gráfica interactiva de nivel de la regla
         st.markdown("---")
-        st.markdown("#### 📈 Curva de Calibración del Tanque")
-        
+        st.markdown("#### 📈 Nivel del Tanque en Tiempo Real")
         df_chart = df_tanque.copy()
         chart = alt.Chart(df_chart).mark_line(color="#38bdf8", strokeWidth=2).encode(
             x=alt.X("inches:Q", title="Nivel (Pulgadas)"),
@@ -328,74 +362,77 @@ with tab1:
             tooltip=["inches", "gallons"]
         )
 
-        # Punto actual
         pt = pd.DataFrame([{"inches": nivel_final_in, "gallons": galones_calc}])
-        point_chart = alt.Chart(pt).mark_point(color="#f43f5e", size=120, filled=True).encode(
+        point_chart = alt.Chart(pt).mark_point(color="#f43f5e", size=130, filled=True).encode(
             x="inches:Q",
             y="gallons:Q",
             tooltip=["inches", "gallons"]
         )
 
-        st.altair_chart((chart + point_chart).properties(width="container", height=300), use_container_width=True)
+        st.altair_chart((chart + point_chart).properties(width="container", height=280), use_container_width=True)
 
     else:
-        # Galones -> Pulgadas
+        # Modo Galones -> Pulgadas
         with col_inputs:
-            st.markdown("### 📥 Entrada de Volumen")
+            st.markdown("### 🛢️ Entrada de Galones Objetivo")
             
-            val_gal = st.slider(
-                "Volumen en Galones:",
+            galones_input = st.number_input(
+                "Ingresa Galones:",
                 min_value=0.0,
                 max_value=max_gallons,
                 value=5000.0,
                 step=50.0,
-                key="slider_gal_prev"
+                key="num_galones_directo"
             )
 
-            val_gal_exact = st.number_input(
-                "Ajuste Preciso (Galones):",
+            galones_final = st.slider(
+                "Ajuste Deslizante de Galones:",
                 min_value=0.0,
                 max_value=max_gallons,
-                value=float(val_gal),
-                step=1.0,
-                format="%.2f",
-                key="num_gal_prev"
+                value=float(galones_input),
+                step=10.0,
+                key="slider_galones_directo"
             )
 
-            galones_final = val_gal_exact
             inches_calc = float(f_in_quad(galones_final))
             porcentaje = (galones_final / max_gallons) * 100
 
+            # Desglose de pulgadas calculadas a formato fraccionario
+            pulg_int = int(inches_calc)
+            pulg_dec = inches_calc - pulg_int
+            frac_16 = round(pulg_dec * 16)
+            frac_texto = f"{pulg_int} in" if frac_16 == 0 else f"{pulg_int} {frac_16}/16 in"
+
         with col_results:
-            st.markdown("### 📊 Resultado de Cubaje")
-            
+            st.markdown("### 📊 Resultado de Nivel Requerido")
+
             st.markdown(
                 f"""
                 <div class="metric-card">
                     <div class="metric-label">Nivel de Regla Requerido</div>
                     <div class="metric-value" style="color: #818cf8;">{inches_calc:.3f}"</div>
-                    <div class="metric-sub">Porcentaje de Capacidad: {porcentaje:.1f}%</div>
+                    <div class="metric-sub">Aproximado en Fracción: {frac_texto}</div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
             st.markdown("<br>", unsafe_allow_html=True)
+
             st.markdown(
                 f"""
                 <div class="metric-card">
                     <div class="metric-label">Volumen Solicitado</div>
                     <div class="metric-value">{galones_final:,.2f} GAL</div>
-                    <div class="metric-sub">Faltante para Tanque Lleno: {max_gallons - galones_final:,.2f} GAL</div>
+                    <div class="metric-sub">Porcentaje de Capacidad: {porcentaje:.1f}%</div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
-        # Gráfica interactiva del tanque
+        # Gráfica interactiva de curva
         st.markdown("---")
-        st.markdown("#### 📈 Curva de Calibración del Tanque")
-        
+        st.markdown("#### 📈 Nivel del Tanque en Tiempo Real")
         df_chart = df_tanque.copy()
         chart = alt.Chart(df_chart).mark_line(color="#818cf8", strokeWidth=2).encode(
             x=alt.X("inches:Q", title="Nivel (Pulgadas)"),
@@ -404,13 +441,13 @@ with tab1:
         )
 
         pt = pd.DataFrame([{"inches": inches_calc, "gallons": galones_final}])
-        point_chart = alt.Chart(pt).mark_point(color="#f43f5e", size=120, filled=True).encode(
+        point_chart = alt.Chart(pt).mark_point(color="#f43f5e", size=130, filled=True).encode(
             x="inches:Q",
             y="gallons:Q",
             tooltip=["inches", "gallons"]
         )
 
-        st.altair_chart((chart + point_chart).properties(width="container", height=300), use_container_width=True)
+        st.altair_chart((chart + point_chart).properties(width="container", height=280), use_container_width=True)
 
 # ==========================================
 # PESTAÑA 2: REGISTRO DE FULEO EN SUPABASE
