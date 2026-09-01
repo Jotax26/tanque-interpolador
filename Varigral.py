@@ -230,17 +230,17 @@ tab1, tab2, tab3 = st.tabs(["📏 Cubaje de Tanque", "⛽ Registrar Fuleo (Nube)
 # ==========================================
 with tab1:
     col_in, col_out = st.columns([1.1, 0.9], gap="large")
-    modo = st.radio("Modo de Operación:", ["Pulgadas ➔ Galones", "Galones ➔ Pulgadas"], horizontal=True)
+    modo = st.radio("Modo de Operación:", ["Pulgadas ➔ Galones", "Galones ➔ Pulgadas"], horizontal=True, key="modo_cubaje")
 
     if modo == "Pulgadas ➔ Galones":
         with col_in:
-            val_input = st.slider("Nivel en Tanque (in):", 0.0, max_inches, 44.375, step=0.0625)
+            val_input = st.slider("Nivel en Tanque (in):", 0.0, max_inches, 44.375, step=0.0625, key="slider_inches")
         res_val = float(f_gal_quad(val_input))
         with col_out:
             st.markdown(f'<div class="metric-card"><div class="metric-label">Volumen Disponible</div><div class="metric-value">{res_val:,.2f} GAL</div></div>', unsafe_allow_html=True)
     else:
         with col_in:
-            val_input = st.number_input("Volumen Objetivo (Gal):", min_value=0.0, max_value=max_gallons, value=5000.0)
+            val_input = st.number_input("Volumen Objetivo (Gal):", min_value=0.0, max_value=max_gallons, value=5000.0, key="num_gallons")
         res_val = float(f_in_quad(val_input))
         with col_out:
             st.markdown(f'<div class="metric-card"><div class="metric-label">Nivel Requerido</div><div class="metric-value" style="color:#818cf8;">{res_val:.3f}"</div></div>', unsafe_allow_html=True)
@@ -252,44 +252,43 @@ with tab2:
     st.markdown("### 🛢️ Registrar Dispensación de Combustible")
     unidades_opts = df_equipos["UNIDAD"].tolist() if not df_equipos.empty else []
 
-    with st.form("form_fuleo_supabase", clear_on_submit=True):
+    with st.form("form_fuleo_supabase"):
         c1, c2, c3 = st.columns(3)
         with c1:
-            unidad_sel = st.selectbox("Unidad:", unidades_opts)
-            bomba = st.selectbox("Bomba:", ["Bomba Negra", "Bomba Verde"])
+            unidad_sel = st.selectbox("Unidad:", unidades_opts, key="fuleo_unidad")
+            bomba = st.selectbox("Bomba:", ["Bomba Negra", "Bomba Verde"], key="fuleo_bomba")
 
         with c2:
-            val_inicial = st.number_input("Contador Inicial (Gal):", min_value=0.0, step=0.1, format="%.2f")
-            val_final = st.number_input("Contador Final (Gal):", min_value=0.0, step=0.1, format="%.2f")
+            val_inicial = st.number_input("Contador Inicial (Gal):", min_value=0.0, step=0.1, format="%.2f", key="fuleo_init")
+            val_final = st.number_input("Contador Final (Gal):", min_value=0.0, step=0.1, format="%.2f", key="fuleo_fin")
 
         with c3:
-            operador = st.text_input("Operador/Despachador:")
+            operador = st.text_input("Operador/Despachador:", key="fuleo_op")
             despachado = max(0.0, val_final - val_inicial)
-            st.metric("Galones Dispensados", f"{despachado:,.2f} Gal")
+            st.text(f"Galones Aprox: {despachado:,.2f} Gal")
 
         submitted = st.form_submit_button("💾 Guardar Fuleo en Supabase", use_container_width=True)
 
-        if submitted:
-            if val_final <= val_inicial:
-                st.error("Error: El contador final debe ser mayor que el inicial.")
-            elif not unidad_sel:
-                st.error("Error: Debe seleccionar una unidad.")
-            else:
-                eq_row = df_equipos[df_equipos["UNIDAD"] == unidad_sel].iloc[0]
-                registro = {
-                    "fecha_hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    "unidad": unidad_sel,
-                    "placa": str(eq_row["PLACA"]),
-                    "marca": str(eq_row["MARCA"]),
-                    "bomba": bomba,
-                    "contador_inicial": float(val_inicial),
-                    "contador_final": float(val_final),
-                    "galones_dispensados": round(float(despachado), 2),
-                    "operador": operador,
-                }
-                guardar_fuleo(registro)
-                st.success(f"✅ Fuleo guardado exitosamente para {unidad_sel} ({despachado:.2f} Gal).")
-                st.rerun()
+    if submitted:
+        if val_final <= val_inicial:
+            st.error("Error: El contador final debe ser mayor que el inicial.")
+        elif not unidad_sel:
+            st.error("Error: Debe seleccionar una unidad.")
+        else:
+            eq_row = df_equipos[df_equipos["UNIDAD"] == unidad_sel].iloc[0]
+            registro = {
+                "fecha_hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "unidad": unidad_sel,
+                "placa": str(eq_row["PLACA"]),
+                "marca": str(eq_row["MARCA"]),
+                "bomba": bomba,
+                "contador_inicial": float(val_inicial),
+                "contador_final": float(val_final),
+                "galones_dispensados": round(float(despachado), 2),
+                "operador": operador,
+            }
+            guardar_fuleo(registro)
+            st.success(f"✅ Fuleo guardado exitosamente para {unidad_sel} ({despachado:.2f} Gal).")
 
     st.markdown("---")
     st.markdown("### 📊 Registros Guardados en Supabase")
@@ -305,6 +304,7 @@ with tab2:
             data=buffer_fuleo.getvalue(),
             file_name=f"historial_fuleos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="btn_down_fuleos"
         )
     else:
         st.info("No hay registros de fuleo en la base de datos.")
@@ -318,35 +318,34 @@ with tab3:
 
     with col_add:
         st.markdown("#### ➕ Agregar Nuevo Equipo")
-        with st.form("form_add_eq", clear_on_submit=True):
-            nueva_unidad = st.text_input("Unidad / Código (Ej. A22):").strip().upper()
-            nueva_placa = st.text_input("Placa (Ej. C-145000):").strip().upper()
-            nuevo_ano = st.number_input("Año:", min_value=1990, max_value=2030, value=2025)
-            nueva_marca = st.text_input("Marca / Modelo (Ej. FREIGHTLINER):").strip().upper()
-            
+        with st.form("form_add_eq"):
+            nueva_unidad = st.text_input("Unidad / Código (Ej. A22):", key="add_u").strip().upper()
+            nueva_placa = st.text_input("Placa (Ej. C-145000):", key="add_p").strip().upper()
+            nuevo_ano = st.number_input("Año:", min_value=1990, max_value=2030, value=2025, key="add_a")
+            nueva_marca = st.text_input("Marca / Modelo (Ej. FREIGHTLINER):", key="add_m").strip().upper()
             btn_add = st.form_submit_button("➕ Guardar en Supabase")
-            if btn_add:
-                if not nueva_unidad or not nueva_placa:
-                    st.error("Error: Completa los campos requeridos.")
-                else:
-                    agregar_equipo({
-                        "UNIDAD": nueva_unidad,
-                        "PLACA": nueva_placa,
-                        "AÑO": int(nuevo_ano),
-                        "MARCA": nueva_marca
-                    })
-                    st.success(f"✅ Unidad {nueva_unidad} agregada.")
-                    st.rerun()
+
+        if btn_add:
+            if not nueva_unidad or not nueva_placa:
+                st.error("Error: Completa los campos requeridos.")
+            else:
+                agregar_equipo({
+                    "UNIDAD": nueva_unidad,
+                    "PLACA": nueva_placa,
+                    "AÑO": int(nuevo_ano),
+                    "MARCA": nueva_marca
+                })
+                st.success(f"✅ Unidad {nueva_unidad} agregada.")
 
     with col_del:
         st.markdown("#### 🗑️ Eliminar Equipo")
         with st.form("form_del_eq"):
-            unidad_a_eliminar = st.selectbox("Selecciona Unidad:", unidades_opts)
+            unidad_a_eliminar = st.selectbox("Selecciona Unidad:", unidades_opts, key="del_u")
             btn_del = st.form_submit_button("🗑️ Eliminar Registro")
-            if btn_del:
-                eliminar_equipo(unidad_a_eliminar)
-                st.warning(f"❌ Unidad {unidad_a_eliminar} eliminada.")
-                st.rerun()
+
+        if btn_del:
+            eliminar_equipo(unidad_a_eliminar)
+            st.warning(f"❌ Unidad {unidad_a_eliminar} eliminada.")
 
     st.markdown("---")
     st.markdown(f"#### 📋 Catálogo en Vivo ({len(df_equipos)} Equipos)")
@@ -361,4 +360,5 @@ with tab3:
         data=buffer_db.getvalue(),
         file_name="catalogo_equipos.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="btn_down_flota"
     )
