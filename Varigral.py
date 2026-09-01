@@ -150,28 +150,45 @@ INITIAL_EQUIPOS = [
     {"UNIDAD": "PL08", "PLACA": "RE-22150", "AÑO": 2025, "MARCA": "SINOTRUCK"}
 ]
 
-# CRUD Supabase
+# CRUD Supabase con Manejo de Excepciones
 def obtener_equipos():
-    res = supabase.table("equipos").select("*").execute()
-    df = pd.DataFrame(res.data)
-    if df.empty:
-        supabase.table("equipos").upsert(INITIAL_EQUIPOS, on_conflict="UNIDAD").execute()
+    try:
         res = supabase.table("equipos").select("*").execute()
         df = pd.DataFrame(res.data)
-    return df
+        if df.empty:
+            supabase.table("equipos").upsert(INITIAL_EQUIPOS, on_conflict="UNIDAD").execute()
+            res = supabase.table("equipos").select("*").execute()
+            df = pd.DataFrame(res.data)
+        return df
+    except Exception as e:
+        st.error(f"⚠️ Error al conectar con Supabase (equipos): {e}")
+        return pd.DataFrame(INITIAL_EQUIPOS)
 
 def obtener_fuleos():
-    res = supabase.table("fuleos").select("*").order("created_at", desc=True).execute()
-    return pd.DataFrame(res.data)
+    try:
+        res = supabase.table("fuleos").select("*").order("created_at", desc=True).execute()
+        return pd.DataFrame(res.data)
+    except Exception as e:
+        st.error(f"⚠️ Error al conectar con Supabase (fuleos): {e}")
+        return pd.DataFrame()
 
 def guardar_fuleo(datos):
-    supabase.table("fuleos").insert(datos).execute()
+    try:
+        supabase.table("fuleos").insert(datos).execute()
+    except Exception as e:
+        st.error(f"Error al guardar fuleo: {e}")
 
 def agregar_equipo(datos):
-    supabase.table("equipos").insert(datos).execute()
+    try:
+        supabase.table("equipos").insert(datos).execute()
+    except Exception as e:
+        st.error(f"Error al agregar equipo: {e}")
 
 def eliminar_equipo(unidad):
-    supabase.table("equipos").delete().eq("UNIDAD", unidad).execute()
+    try:
+        supabase.table("equipos").delete().eq("UNIDAD", unidad).execute()
+    except Exception as e:
+        st.error(f"Error al eliminar equipo: {e}")
 
 # ==========================================
 # INTERPOLACIÓN Y TABLA DE CUBAJE
