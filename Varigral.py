@@ -1,5 +1,7 @@
+import io
 import math
 import os
+from datetime import datetime
 import altair as alt
 import numpy as np
 import pandas as pd
@@ -105,17 +107,33 @@ def get_interpolators():
     df["gallons"] = df["Volumen lleno (galones estadounidenses)"]
 
     f_gallons_quad = interp1d(
-        df["inches"], df["gallons"], kind="quadratic", bounds_error=False, fill_value="extrapolate"
+        df["inches"],
+        df["gallons"],
+        kind="quadratic",
+        bounds_error=False,
+        fill_value="extrapolate",
     )
     f_gallons_lin = interp1d(
-        df["inches"], df["gallons"], kind="linear", bounds_error=False, fill_value="extrapolate"
+        df["inches"],
+        df["gallons"],
+        kind="linear",
+        bounds_error=False,
+        fill_value="extrapolate",
     )
 
     f_inches_quad = interp1d(
-        df["gallons"], df["inches"], kind="quadratic", bounds_error=False, fill_value="extrapolate"
+        df["gallons"],
+        df["inches"],
+        kind="quadratic",
+        bounds_error=False,
+        fill_value="extrapolate",
     )
     f_inches_lin = interp1d(
-        df["gallons"], df["inches"], kind="linear", bounds_error=False, fill_value="extrapolate"
+        df["gallons"],
+        df["inches"],
+        kind="linear",
+        bounds_error=False,
+        fill_value="extrapolate",
     )
 
     return df, f_gallons_quad, f_gallons_lin, f_inches_quad, f_inches_lin
@@ -149,8 +167,12 @@ st.markdown(
 # SIDEBAR
 # ==========================================
 st.sidebar.markdown("### ⚙️ Parámetros")
-modo = st.sidebar.radio("Modo de Operación:", ["Pulgadas ➔ Galones", "Galones ➔ Pulgadas"])
-algoritmo = st.sidebar.selectbox("Algoritmo:", ["Cuadrático (Recomendado)", "Lineal", "Más Cercano"])
+modo = st.sidebar.radio(
+    "Modo de Operación:", ["Pulgadas ➔ Galones", "Galones ➔ Pulgadas"]
+)
+algoritmo = st.sidebar.selectbox(
+    "Algoritmo:", ["Cuadrático (Recomendado)", "Lineal", "Más Cercano"]
+)
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📐 Capacidades")
@@ -166,24 +188,45 @@ if modo == "Pulgadas ➔ Galones":
     with col_in:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
         st.markdown("#### 📏 Entrada de Nivel")
-        fmt = st.radio("Formato:", ["Por Octavos", "Decimal Directo"], horizontal=True)
+        fmt = st.radio(
+            "Formato:", ["Por Octavos", "Decimal Directo"], horizontal=True
+        )
 
         if fmt == "Por Octavos":
             c1, c2 = st.columns(2)
             with c1:
-                p_entera = st.number_input("Pulgadas:", min_value=0, max_value=int(max_inches), value=44)
+                p_entera = st.number_input(
+                    "Pulgadas:",
+                    min_value=0,
+                    max_value=int(max_inches),
+                    value=44,
+                )
             with c2:
                 octavos_dict = {
-                    '0"': 0.0, '1/8"': 0.125, '1/4"': 0.25, '3/8"': 0.375,
-                    '1/2"': 0.5, '5/8"': 0.625, '3/4"': 0.75, '7/8"': 0.875,
+                    '0"': 0.0,
+                    '1/8"': 0.125,
+                    '1/4"': 0.25,
+                    '3/8"': 0.375,
+                    '1/2"': 0.5,
+                    '5/8"': 0.625,
+                    '3/4"': 0.75,
+                    '7/8"': 0.875,
                 }
-                p_frac_str = st.selectbox("Octavo:", list(octavos_dict.keys()), index=3)
+                p_frac_str = st.selectbox(
+                    "Octavo:", list(octavos_dict.keys()), index=3
+                )
                 p_frac = octavos_dict[p_frac_str]
 
             val_input = float(p_entera + p_frac)
-            readout = f'{p_entera} {p_frac_str}' if p_frac_str != '0"' else f'{p_entera}"'
+            readout = (
+                f'{p_entera} {p_frac_str}'
+                if p_frac_str != '0"'
+                else f'{p_entera}"'
+            )
         else:
-            val_input = st.slider("Nivel (in):", 0.0, max_inches, 44.375, step=0.0625)
+            val_input = st.slider(
+                "Nivel (in):", 0.0, max_inches, 44.375, step=0.0625
+            )
             readout = f'{val_input:.3f}"'
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -225,7 +268,13 @@ else:
     with col_in:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
         st.markdown("#### 🛢️ Entrada de Volumen")
-        val_input = st.number_input("Volumen (Galones):", min_value=0.0, max_value=max_gallons, value=5000.0, step=50.0)
+        val_input = st.number_input(
+            "Volumen (Galones):",
+            min_value=0.0,
+            max_value=max_gallons,
+            value=5000.0,
+            step=50.0,
+        )
         st.markdown("</div>", unsafe_allow_html=True)
 
     if algoritmo == "Más Cercano":
@@ -275,7 +324,7 @@ else:
         )
 
 # ==========================================
-# HISTORIAL DE MEDICIONES
+# HISTORIAL DE MEDICIONES CON FECHA, HORA Y EXCEL
 # ==========================================
 st.markdown("---")
 st.markdown("### 📋 Historial de Turno")
@@ -286,25 +335,36 @@ if "historial" not in st.session_state:
 col_btn1, col_btn2 = st.columns([1, 4])
 with col_btn1:
     if st.button("💾 Guardar Medición", use_container_width=True):
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         registro = {
+            "Fecha y Hora": now_str,
             "Modo": modo,
-            "Nivel (Pulgadas)": round(val_input if modo == "Pulgadas ➔ Galones" else res_val, 3),
-            "Volumen (Galones)": round(res_val if modo == "Pulgadas ➔ Galones" else val_input, 2),
-            "Capacidad %": round(pct_lleno, 1)
+            "Nivel (Pulgadas)": round(
+                val_input if modo == "Pulgadas ➔ Galones" else res_val, 3
+            ),
+            "Volumen (Galones)": round(
+                res_val if modo == "Pulgadas ➔ Galones" else val_input, 2
+            ),
+            "Capacidad %": round(pct_lleno, 1),
+            "Algoritmo": algoritmo,
         }
         st.session_state.historial.insert(0, registro)
-        st.toast("✅ Registro guardado exitosamente.")
+        st.toast(f"✅ Registro guardado ({now_str})")
 
 if st.session_state.historial:
     df_historial = pd.DataFrame(st.session_state.historial)
     st.dataframe(df_historial, use_container_width=True)
-    
-    csv_data = df_historial.to_csv(index=False).encode('utf-8')
+
+    # Generar binario de Excel usando io.BytesIO
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df_historial.to_excel(writer, index=False, sheet_name="Mediciones")
+
     st.download_button(
-        label="📥 Descargar Reporte (CSV)",
-        data=csv_data,
-        file_name="reporte_tanque.csv",
-        mime="text/csv",
+        label="📊 Descargar Reporte en Excel (.xlsx)",
+        data=buffer.getvalue(),
+        file_name=f"reporte_tanque_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
 # ==========================================
@@ -323,7 +383,10 @@ line_chart = (
     .encode(
         x=alt.X("inches:Q", title="Nivel (Pulgadas)"),
         y=alt.Y("gallons:Q", title="Volumen (Galones)"),
-        tooltip=[alt.Tooltip("inches:Q", format=".2f"), alt.Tooltip("gallons:Q", format=",.2f")],
+        tooltip=[
+            alt.Tooltip("inches:Q", format=".2f"),
+            alt.Tooltip("gallons:Q", format=",.2f"),
+        ],
     )
 )
 
