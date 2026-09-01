@@ -230,13 +230,16 @@ max_gallons = float(df_tanque["gallons"].max())
 # Cargar Equipos desde Supabase
 df_equipos = obtener_equipos()
 
-# Diccionario de Fracciones para Selección Rápida
-FRACCIONES_DICT = {
+# Diccionario de Fracciones Exclusivo en Octavos
+FRACCIONES_OCTAVOS = {
     "0 (Exacto)": 0.0,
-    "1/16": 1/16, "1/8": 1/8, "3/16": 3/16, "1/4": 1/4,
-    "5/16": 5/16, "3/8": 3/8, "7/16": 7/16, "1/2": 1/2,
-    "9/16": 9/16, "5/8": 5/8, "11/16": 11/16, "3/4": 3/4,
-    "13/16": 13/16, "7/8": 7/8, "15/16": 15/16
+    "1/8": 1 / 8,
+    "1/4 (2/8)": 2 / 8,
+    "3/8": 3 / 8,
+    "1/2 (4/8)": 4 / 8,
+    "5/8": 5 / 8,
+    "3/4 (6/8)": 6 / 8,
+    "7/8": 7 / 8
 }
 
 # ==========================================
@@ -259,7 +262,7 @@ st.markdown(
 tab1, tab2, tab3 = st.tabs(["📏 Cubaje de Tanque", "⛽ Registrar Fuleo (Nube)", "🚛 Gestión de Flota"])
 
 # ==========================================
-# PESTAÑA 1: CUBAJE CON DISEÑO TRADICIONAL DE PULGADAS
+# PESTAÑA 1: CUBAJE CON MEDIDAS EN OCTAVOS
 # ==========================================
 with tab1:
     modo = st.radio(
@@ -274,9 +277,9 @@ with tab1:
 
     if modo == "Pulgadas ➔ Galones":
         with col_inputs:
-            st.markdown("### 📐 Selección de Medición (Varilla)")
+            st.markdown("### 📐 Selección de Medición (Varilla en Octavos)")
 
-            # Fila de Pulgadas Enteras + Fracciones
+            # Fila de Pulgadas Enteras + Fracciones en Octavos
             col_ent, col_frac = st.columns(2)
             with col_ent:
                 pulgadas_enteras = st.number_input(
@@ -289,23 +292,23 @@ with tab1:
                 )
             with col_frac:
                 frac_str = st.selectbox(
-                    "Fracción de Pulgada:",
-                    list(FRACCIONES_DICT.keys()),
-                    index=7, # Por defecto 3/8
+                    "Fracción (Octavos):",
+                    list(FRACCIONES_OCTAVOS.keys()),
+                    index=3, # Por defecto 3/8
                     key="fraccion_inp"
                 )
 
             # Cálculo de la suma decimal
-            pulgadas_totales = pulgadas_enteras + FRACCIONES_DICT[frac_str]
+            pulgadas_totales = pulgadas_enteras + FRACCIONES_OCTAVOS[frac_str]
 
             st.markdown("<br>", unsafe_allow_html=True)
-            # Slider complementario para ajuste rápido/visual
+            # Slider ajustado en pasos de 1/8 (0.125)
             nivel_final_in = st.slider(
-                "Ajuste Deslizante Fino (Pulgadas Decimales):",
+                "Ajuste Deslizante (Pulgadas Decimales):",
                 min_value=0.0,
                 max_value=max_inches,
                 value=float(pulgadas_totales),
-                step=0.0625,
+                step=0.125,
                 key="slider_pulgadas_fino"
             )
 
@@ -320,7 +323,7 @@ with tab1:
                 <div class="metric-card">
                     <div class="metric-label">Lectura Seleccionada</div>
                     <div class="metric-value" style="color: #818cf8;">{nivel_final_in:.3f}"</div>
-                    <div class="metric-sub">Pulgadas Enteras + Fracción</div>
+                    <div class="metric-sub">Pulgadas Enteras + Octavos</div>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -352,7 +355,7 @@ with tab1:
                 unsafe_allow_html=True
             )
 
-        # Gráfica interactiva de nivel de la regla
+        # Gráfica interactiva de nivel
         st.markdown("---")
         st.markdown("#### 📈 Nivel del Tanque en Tiempo Real")
         df_chart = df_tanque.copy()
@@ -397,11 +400,11 @@ with tab1:
             inches_calc = float(f_in_quad(galones_final))
             porcentaje = (galones_final / max_gallons) * 100
 
-            # Desglose de pulgadas calculadas a formato fraccionario
+            # Desglose de pulgadas calculadas expresadas en OCTAVOS
             pulg_int = int(inches_calc)
             pulg_dec = inches_calc - pulg_int
-            frac_16 = round(pulg_dec * 16)
-            frac_texto = f"{pulg_int} in" if frac_16 == 0 else f"{pulg_int} {frac_16}/16 in"
+            frac_8 = round(pulg_dec * 8)
+            frac_texto = f"{pulg_int} in" if frac_8 == 0 else f"{pulg_int} {frac_8}/8 in"
 
         with col_results:
             st.markdown("### 📊 Resultado de Nivel Requerido")
@@ -411,7 +414,7 @@ with tab1:
                 <div class="metric-card">
                     <div class="metric-label">Nivel de Regla Requerido</div>
                     <div class="metric-value" style="color: #818cf8;">{inches_calc:.3f}"</div>
-                    <div class="metric-sub">Aproximado en Fracción: {frac_texto}</div>
+                    <div class="metric-sub">Aproximado en Octavos: {frac_texto}</div>
                 </div>
                 """,
                 unsafe_allow_html=True
