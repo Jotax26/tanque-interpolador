@@ -5,5 +5,4 @@ plotly
 scipy
 altair
 openpyxl
-streamlit-gsheets
 supabase
