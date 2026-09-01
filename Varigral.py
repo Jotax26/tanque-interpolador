@@ -7,12 +7,13 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 import streamlit as st
+from supabase import create_client
 
 # ==========================================
 # CONFIGURACIÓN DE PÁGINA Y ESTILOS
 # ==========================================
 st.set_page_config(
-    page_title="VARIGRAL | Tank Analytics",
+    page_title="VARIGRAL | Cloud Tank & Fleet System",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -34,14 +35,12 @@ st.markdown(
     
     #MainMenu, footer, header {visibility: hidden;}
 
-    /* Banner Principal */
     .hero-container {
         background: linear-gradient(135deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.8) 100%);
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 24px;
         padding: 24px 32px;
         margin-bottom: 24px;
-        box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
     }
 
     .hero-title {
@@ -51,10 +50,8 @@ st.markdown(
         font-weight: 800;
         font-size: 2.2rem;
         margin: 0;
-        letter-spacing: -0.5px;
     }
 
-    /* Cards Informativas */
     .metric-card {
         background: rgba(15, 23, 42, 0.6);
         border: 1px solid rgba(255, 255, 255, 0.08);
@@ -82,15 +79,107 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ==========================================
+# CONEXIÓN A SUPABASE Y DATOS INICIALES
+# ==========================================
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
+@st.cache_resource
+def init_supabase():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+supabase = init_supabase()
+
+INITIAL_EQUIPOS = [
+    {"UNIDAD": "A01", "PLACA": "C-125657", "AÑO": 2013, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A02", "PLACA": "C-125502", "AÑO": 2013, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A03", "PLACA": "C-125609", "AÑO": 2013, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A04", "PLACA": "C-125518", "AÑO": 2013, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A05", "PLACA": "C-125603", "AÑO": 2013, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A06", "PLACA": "C-125721", "AÑO": 2013, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A07", "PLACA": "C-125602", "AÑO": 2013, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A08", "PLACA": "C-125517", "AÑO": 2013, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A09", "PLACA": "C-125736", "AÑO": 2015, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A10", "PLACA": "C-125501", "AÑO": 2015, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A11", "PLACA": "C-66703", "AÑO": 2015, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A12", "PLACA": "C-125742", "AÑO": 2015, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A13", "PLACA": "C-125611", "AÑO": 2016, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A14", "PLACA": "C-125720", "AÑO": 2016, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A15", "PLACA": "C-125610", "AÑO": 2016, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A16", "PLACA": "C-96846", "AÑO": 2016, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A17", "PLACA": "C-118541", "AÑO": 2012, "MARCA": "FREIGHTLINER"},
+    {"UNIDAD": "A18", "PLACA": "C-125745", "AÑO": 2014, "MARCA": "FREIGHTLINER"},
+    {"UNIDAD": "A19", "PLACA": "C-119147", "AÑO": 2012, "MARCA": "INTERNATIONAL"},
+    {"UNIDAD": "A20", "PLACA": "C-144118", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "A21", "PLACA": "C-144119", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "C06", "PLACA": "C-117153", "AÑO": 2013, "MARCA": "FREIGHTLINER CASCADIA"},
+    {"UNIDAD": "C07", "PLACA": "C-117060", "AÑO": 2013, "MARCA": "FREIGHTLINER CASCADIA"},
+    {"UNIDAD": "C08", "PLACA": "C-116995", "AÑO": 2013, "MARCA": "FREIGHTLINER CASCADIA"},
+    {"UNIDAD": "C09", "PLACA": "C-119375", "AÑO": 2012, "MARCA": "FREIGHTLINER BLANCO"},
+    {"UNIDAD": "C10", "PLACA": "C-143355", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "C11", "PLACA": "C-143356", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "C12", "PLACA": "C-143359", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "C13", "PLACA": "C-143358", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "C14", "PLACA": "C-143357", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "C15", "PLACA": "C-143412", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "C16", "PLACA": "C-143410", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "C17", "PLACA": "C-143411", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "E03", "PLACA": "CAT0324DCDFP00969", "AÑO": 2011, "MARCA": "CAT 324DL"},
+    {"UNIDAD": "E04", "PLACA": "HHKHZ810HE0001476", "AÑO": 2016, "MARCA": "HYUNDAI ROBEX 300LC-9S"},
+    {"UNIDAD": "E05", "PLACA": "HHKHZ810HE0001487", "AÑO": 2016, "MARCA": "HYUNDAI ROBEX 300LC-9S"},
+    {"UNIDAD": "G01", "PLACA": "RE-1658", "AÑO": 2014, "MARCA": "CARMEX"},
+    {"UNIDAD": "G03", "PLACA": "RE-10491", "AÑO": 2014, "MARCA": "CARMEX"},
+    {"UNIDAD": "G05", "PLACA": "RE-10482", "AÑO": 2016, "MARCA": "CARMEX"},
+    {"UNIDAD": "L01", "PLACA": "P-597222", "AÑO": 2008, "MARCA": "MAZDA BT-50"},
+    {"UNIDAD": "L02", "PLACA": "P-339962", "AÑO": 2008, "MARCA": "NISSAN FRONTIER LCV"},
+    {"UNIDAD": "M01", "PLACA": "P-199D3", "AÑO": 2011, "MARCA": "MERCEDES L0015/48"},
+    {"UNIDAD": "MB01", "PLACA": "P-920975", "AÑO": 2019, "MARCA": "HYUNDAI COUNTY"},
+    {"UNIDAD": "MB02", "PLACA": "P-11D28", "AÑO": 2019, "MARCA": "HYUNDAI COUNTY"},
+    {"UNIDAD": "MOTO", "PLACA": "M-359043", "AÑO": 2016, "MARCA": "MOTO SUZUKI"},
+    {"UNIDAD": "P01", "PLACA": "P-843791", "AÑO": 2019, "MARCA": "KIA K2700"},
+    {"UNIDAD": "P02", "PLACA": "C-65671", "AÑO": 2015, "MARCA": "INTERNATIONAL 7600"},
+    {"UNIDAD": "P03", "PLACA": "P-697022", "AÑO": 2016, "MARCA": "HYUNDAI H-100"},
+    {"UNIDAD": "PL01", "PLACA": "RE-20889", "AÑO": 2007, "MARCA": "FONTAIN"},
+    {"UNIDAD": "PL02", "PLACA": "RE-22070", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "PL03", "PLACA": "RE-22071", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "PL04", "PLACA": "RE-22074", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "PL05", "PLACA": "RE-22116", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "PL06", "PLACA": "RE-22118", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "PL07", "PLACA": "RE-22119", "AÑO": 2025, "MARCA": "SINOTRUCK"},
+    {"UNIDAD": "PL08", "PLACA": "RE-22150", "AÑO": 2025, "MARCA": "SINOTRUCK"}
+]
+
+# CRUD Supabase
+def obtener_equipos():
+    res = supabase.table("equipos").select("*").execute()
+    df = pd.DataFrame(res.data)
+    if df.empty:
+        supabase.table("equipos").upsert(INITIAL_EQUIPOS, on_conflict="UNIDAD").execute()
+        res = supabase.table("equipos").select("*").execute()
+        df = pd.DataFrame(res.data)
+    return df
+
+def obtener_fuleos():
+    res = supabase.table("fuleos").select("*").order("created_at", desc=True).execute()
+    return pd.DataFrame(res.data)
+
+def guardar_fuleo(datos):
+    supabase.table("fuleos").insert(datos).execute()
+
+def agregar_equipo(datos):
+    supabase.table("equipos").insert(datos).execute()
+
+def eliminar_equipo(unidad):
+    supabase.table("equipos").delete().eq("UNIDAD", unidad).execute()
 
 # ==========================================
-# Carga e Interpolación Pre-calculada
+# INTERPOLACIÓN Y TABLA DE CUBAJE
 # ==========================================
 @st.cache_resource
 def get_interpolators():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(base_dir, "tank-dip-chart-hCylinder.csv")
-
     df = pd.read_csv(file_path, delimiter=";")
 
     def parse_frac(val):
@@ -106,42 +195,16 @@ def get_interpolators():
     df["inches"] = df["Nivel (pulgadas fraccionarias)"].apply(parse_frac)
     df["gallons"] = df["Volumen lleno (galones estadounidenses)"]
 
-    f_gallons_quad = interp1d(
-        df["inches"],
-        df["gallons"],
-        kind="quadratic",
-        bounds_error=False,
-        fill_value="extrapolate",
-    )
-    f_gallons_lin = interp1d(
-        df["inches"],
-        df["gallons"],
-        kind="linear",
-        bounds_error=False,
-        fill_value="extrapolate",
-    )
+    f_gallons_quad = interp1d(df["inches"], df["gallons"], kind="quadratic", bounds_error=False, fill_value="extrapolate")
+    f_inches_quad = interp1d(df["gallons"], df["inches"], kind="quadratic", bounds_error=False, fill_value="extrapolate")
+    return df, f_gallons_quad, f_inches_quad
 
-    f_inches_quad = interp1d(
-        df["gallons"],
-        df["inches"],
-        kind="quadratic",
-        bounds_error=False,
-        fill_value="extrapolate",
-    )
-    f_inches_lin = interp1d(
-        df["gallons"],
-        df["inches"],
-        kind="linear",
-        bounds_error=False,
-        fill_value="extrapolate",
-    )
+df_tanque, f_gal_quad, f_in_quad = get_interpolators()
+max_inches = float(df_tanque["inches"].max())
+max_gallons = float(df_tanque["gallons"].max())
 
-    return df, f_gallons_quad, f_gallons_lin, f_inches_quad, f_inches_lin
-
-
-df, f_gal_quad, f_gal_lin, f_in_quad, f_in_lin = get_interpolators()
-max_inches = float(df["inches"].max())
-max_gallons = float(df["gallons"].max())
+# Cargar Equipos desde Supabase
+df_equipos = obtener_equipos()
 
 # ==========================================
 # HEADER
@@ -152,10 +215,7 @@ st.markdown(
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <div>
                 <h1 class="hero-title">VARIGRAL</h1>
-                <p style="color: #64748b; margin: 4px 0 0 0; font-size: 0.95rem;">Sistema Avanzado de Cubaje y Análisis de Tanques</p>
-            </div>
-            <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 99px; padding: 6px 16px;">
-                <span style="color: #38bdf8; font-size: 0.85rem; font-weight: 600;">● Online</span>
+                <p style="color: #64748b; margin: 4px 0 0 0; font-size: 0.95rem;">Sistema Integrado de Cubaje, Fuleos y Flota en Supabase</p>
             </div>
         </div>
     </div>
@@ -163,238 +223,142 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ==========================================
-# SIDEBAR
-# ==========================================
-st.sidebar.markdown("### ⚙️ Parámetros")
-modo = st.sidebar.radio(
-    "Modo de Operación:", ["Pulgadas ➔ Galones", "Galones ➔ Pulgadas"]
-)
-algoritmo = st.sidebar.selectbox(
-    "Algoritmo:", ["Cuadrático (Recomendado)", "Lineal", "Más Cercano"]
-)
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📐 Capacidades")
-st.sidebar.metric("Altura Máxima", f'{max_inches:.2f}"')
-st.sidebar.metric("Volumen Máximo", f"{max_gallons:,.2f} Gal")
+tab1, tab2, tab3 = st.tabs(["📏 Cubaje de Tanque", "⛽ Registrar Fuleo (Nube)", "🚛 Gestión de Flota"])
 
 # ==========================================
-# PANEL PRINCIPAL
+# PESTAÑA 1: CUBAJE
 # ==========================================
-col_in, col_out = st.columns([1.1, 0.9], gap="large")
+with tab1:
+    col_in, col_out = st.columns([1.1, 0.9], gap="large")
+    modo = st.radio("Modo de Operación:", ["Pulgadas ➔ Galones", "Galones ➔ Pulgadas"], horizontal=True)
 
-if modo == "Pulgadas ➔ Galones":
-    with col_in:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("#### 📏 Entrada de Nivel")
-        fmt = st.radio(
-            "Formato:", ["Por Octavos", "Decimal Directo"], horizontal=True
-        )
-
-        if fmt == "Por Octavos":
-            c1, c2 = st.columns(2)
-            with c1:
-                p_entera = st.number_input(
-                    "Pulgadas:",
-                    min_value=0,
-                    max_value=int(max_inches),
-                    value=44,
-                )
-            with c2:
-                octavos_dict = {
-                    '0"': 0.0,
-                    '1/8"': 0.125,
-                    '1/4"': 0.25,
-                    '3/8"': 0.375,
-                    '1/2"': 0.5,
-                    '5/8"': 0.625,
-                    '3/4"': 0.75,
-                    '7/8"': 0.875,
-                }
-                p_frac_str = st.selectbox(
-                    "Octavo:", list(octavos_dict.keys()), index=3
-                )
-                p_frac = octavos_dict[p_frac_str]
-
-            val_input = float(p_entera + p_frac)
-            readout = (
-                f'{p_entera} {p_frac_str}'
-                if p_frac_str != '0"'
-                else f'{p_entera}"'
-            )
-        else:
-            val_input = st.slider(
-                "Nivel (in):", 0.0, max_inches, 44.375, step=0.0625
-            )
-            readout = f'{val_input:.3f}"'
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    if algoritmo == "Más Cercano":
-        idx = (df["inches"] - val_input).abs().idxmin()
-        res_val = float(df.loc[idx, "gallons"])
-    elif algoritmo == "Lineal":
-        res_val = float(f_gal_lin(val_input))
-    else:
+    if modo == "Pulgadas ➔ Galones":
+        with col_in:
+            val_input = st.slider("Nivel en Tanque (in):", 0.0, max_inches, 44.375, step=0.0625)
         res_val = float(f_gal_quad(val_input))
-
-    pct_lleno = min(100.0, (val_input / max_inches) * 100)
-
-    with col_out:
-        st.markdown(
-            f"""
-            <div class="metric-card" style="border-color: rgba(56, 189, 248, 0.3); background: linear-gradient(145deg, rgba(15,23,42,0.9), rgba(14,165,233,0.1)); margin-bottom: 20px;">
-                <div class="metric-label">Volumen Estimado</div>
-                <div class="metric-value">{res_val:,.2f} <span style="font-size: 1rem; color: #94a3b8;">GAL</span></div>
-                <div style="margin-top: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 10px; font-size: 0.9rem; color: #cbd5e1;">
-                    📍 Nivel Medido: <b>{readout}</b> ({val_input:.3f} in)
-                </div>
-            </div>
-            
-            <div style="text-align: center;">
-                <div style="width: 150px; height: 150px; border-radius: 50%; border: 4px solid #38bdf8; position: relative; overflow: hidden; margin: 0 auto; background: rgba(15,23,42,0.8); box-shadow: 0 0 20px rgba(56,189,248,0.2);">
-                    <div style="position: absolute; bottom: 0; left: 0; right: 0; height: {pct_lleno}%; background: linear-gradient(180deg, rgba(56,189,248,0.8) 0%, rgba(2,132,199,0.9) 100%); transition: height 0.5s ease-in-out;"></div>
-                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-weight: 800; font-size: 1.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
-                        {pct_lleno:.1f}%
-                    </div>
-                </div>
-                <div style="margin-top: 10px; color: #94a3b8; font-size: 0.85rem; font-weight: 600;">VISTA FRONTAL DEL TANQUE</div>
-            </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
-else:
-    with col_in:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("#### 🛢️ Entrada de Volumen")
-        val_input = st.number_input(
-            "Volumen (Galones):",
-            min_value=0.0,
-            max_value=max_gallons,
-            value=5000.0,
-            step=50.0,
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    if algoritmo == "Más Cercano":
-        idx = (df["gallons"] - val_input).abs().idxmin()
-        res_val = float(df.loc[idx, "inches"])
-    elif algoritmo == "Lineal":
-        res_val = float(f_in_lin(val_input))
+        with col_out:
+            st.markdown(f'<div class="metric-card"><div class="metric-label">Volumen Disponible</div><div class="metric-value">{res_val:,.2f} GAL</div></div>', unsafe_allow_html=True)
     else:
+        with col_in:
+            val_input = st.number_input("Volumen Objetivo (Gal):", min_value=0.0, max_value=max_gallons, value=5000.0)
         res_val = float(f_in_quad(val_input))
+        with col_out:
+            st.markdown(f'<div class="metric-card"><div class="metric-label">Nivel Requerido</div><div class="metric-value" style="color:#818cf8;">{res_val:.3f}"</div></div>', unsafe_allow_html=True)
 
-    entero = int(res_val)
-    resto = res_val - entero
-    octavo = round(resto * 8)
-    if octavo == 8:
-        entero += 1
-        str_frac = ""
-    elif octavo == 0:
-        str_frac = ""
-    else:
-        gcd_v = math.gcd(octavo, 8)
-        str_frac = f" {octavo//gcd_v}/{8//gcd_v}"
+# ==========================================
+# PESTAÑA 2: REGISTRO DE FULEO EN SUPABASE
+# ==========================================
+with tab2:
+    st.markdown("### 🛢️ Registrar Dispensación de Combustible")
+    unidades_opts = df_equipos["UNIDAD"].tolist() if not df_equipos.empty else []
 
-    pct_lleno = min(100.0, (val_input / max_gallons) * 100)
+    with st.form("form_fuleo_supabase", clear_on_submit=True):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            unidad_sel = st.selectbox("Unidad:", unidades_opts)
+            bomba = st.selectbox("Bomba:", ["Bomba Negra", "Bomba Verde"])
 
-    with col_out:
-        st.markdown(
-            f"""
-            <div class="metric-card" style="border-color: rgba(129, 140, 248, 0.3); background: linear-gradient(145deg, rgba(15,23,42,0.9), rgba(129,140,248,0.1)); margin-bottom: 20px;">
-                <div class="metric-label">Nivel de Vara Requerido</div>
-                <div class="metric-value" style="color: #818cf8;">{entero}{str_frac}"</div>
-                <div style="margin-top: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 10px; font-size: 0.9rem; color: #cbd5e1;">
-                    📏 Valor Decimal Exacto: <b>{res_val:.4f} pulgadas</b>
-                </div>
-            </div>
-            
-            <div style="text-align: center;">
-                <div style="width: 150px; height: 150px; border-radius: 50%; border: 4px solid #818cf8; position: relative; overflow: hidden; margin: 0 auto; background: rgba(15,23,42,0.8); box-shadow: 0 0 20px rgba(129,140,248,0.2);">
-                    <div style="position: absolute; bottom: 0; left: 0; right: 0; height: {pct_lleno}%; background: linear-gradient(180deg, rgba(129,140,248,0.8) 0%, rgba(79,70,229,0.9) 100%); transition: height 0.5s ease-in-out;"></div>
-                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-weight: 800; font-size: 1.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
-                        {pct_lleno:.1f}%
-                    </div>
-                </div>
-                <div style="margin-top: 10px; color: #94a3b8; font-size: 0.85rem; font-weight: 600;">VISTA FRONTAL DEL TANQUE</div>
-            </div>
-        """,
-            unsafe_allow_html=True,
+        with c2:
+            val_inicial = st.number_input("Contador Inicial (Gal):", min_value=0.0, step=0.1, format="%.2f")
+            val_final = st.number_input("Contador Final (Gal):", min_value=0.0, step=0.1, format="%.2f")
+
+        with c3:
+            operador = st.text_input("Operador/Despachador:")
+            despachado = max(0.0, val_final - val_inicial)
+            st.metric("Galones Dispensados", f"{despachado:,.2f} Gal")
+
+        submitted = st.form_submit_button("💾 Guardar Fuleo en Supabase", use_container_width=True)
+
+        if submitted:
+            if val_final <= val_inicial:
+                st.error("Error: El contador final debe ser mayor que el inicial.")
+            elif not unidad_sel:
+                st.error("Error: Debe seleccionar una unidad.")
+            else:
+                eq_row = df_equipos[df_equipos["UNIDAD"] == unidad_sel].iloc[0]
+                registro = {
+                    "fecha_hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "unidad": unidad_sel,
+                    "placa": str(eq_row["PLACA"]),
+                    "marca": str(eq_row["MARCA"]),
+                    "bomba": bomba,
+                    "contador_inicial": float(val_inicial),
+                    "contador_final": float(val_final),
+                    "galones_dispensados": round(float(despachado), 2),
+                    "operador": operador,
+                }
+                guardar_fuleo(registro)
+                st.success(f"✅ Fuleo guardado exitosamente para {unidad_sel} ({despachado:.2f} Gal).")
+                st.rerun()
+
+    st.markdown("---")
+    st.markdown("### 📊 Registros Guardados en Supabase")
+    df_fuleos = obtener_fuleos()
+    if not df_fuleos.empty:
+        st.dataframe(df_fuleos, use_container_width=True)
+        buffer_fuleo = io.BytesIO()
+        with pd.ExcelWriter(buffer_fuleo, engine="openpyxl") as writer:
+            df_fuleos.to_excel(writer, index=False, sheet_name="Fuleos_Supabase")
+
+        st.download_button(
+            label="📊 Descargar Reporte en Excel (.xlsx)",
+            data=buffer_fuleo.getvalue(),
+            file_name=f"historial_fuleos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
+    else:
+        st.info("No hay registros de fuleo en la base de datos.")
 
 # ==========================================
-# HISTORIAL DE MEDICIONES CON FECHA, HORA Y EXCEL
+# PESTAÑA 3: FLOTA EN SUPABASE
 # ==========================================
-st.markdown("---")
-st.markdown("### 📋 Historial de Turno")
+with tab3:
+    st.markdown("### 🚛 Base de Datos de Equipos (Supabase)")
+    col_add, col_del = st.columns(2, gap="large")
 
-if "historial" not in st.session_state:
-    st.session_state.historial = []
+    with col_add:
+        st.markdown("#### ➕ Agregar Nuevo Equipo")
+        with st.form("form_add_eq", clear_on_submit=True):
+            nueva_unidad = st.text_input("Unidad / Código (Ej. A22):").strip().upper()
+            nueva_placa = st.text_input("Placa (Ej. C-145000):").strip().upper()
+            nuevo_ano = st.number_input("Año:", min_value=1990, max_value=2030, value=2025)
+            nueva_marca = st.text_input("Marca / Modelo (Ej. FREIGHTLINER):").strip().upper()
+            
+            btn_add = st.form_submit_button("➕ Guardar en Supabase")
+            if btn_add:
+                if not nueva_unidad or not nueva_placa:
+                    st.error("Error: Completa los campos requeridos.")
+                else:
+                    agregar_equipo({
+                        "UNIDAD": nueva_unidad,
+                        "PLACA": nueva_placa,
+                        "AÑO": int(nuevo_ano),
+                        "MARCA": nueva_marca
+                    })
+                    st.success(f"✅ Unidad {nueva_unidad} agregada.")
+                    st.rerun()
 
-col_btn1, col_btn2 = st.columns([1, 4])
-with col_btn1:
-    if st.button("💾 Guardar Medición", use_container_width=True):
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        registro = {
-            "Fecha y Hora": now_str,
-            "Modo": modo,
-            "Nivel (Pulgadas)": round(
-                val_input if modo == "Pulgadas ➔ Galones" else res_val, 3
-            ),
-            "Volumen (Galones)": round(
-                res_val if modo == "Pulgadas ➔ Galones" else val_input, 2
-            ),
-            "Capacidad %": round(pct_lleno, 1),
-            "Algoritmo": algoritmo,
-        }
-        st.session_state.historial.insert(0, registro)
-        st.toast(f"✅ Registro guardado ({now_str})")
+    with col_del:
+        st.markdown("#### 🗑️ Eliminar Equipo")
+        with st.form("form_del_eq"):
+            unidad_a_eliminar = st.selectbox("Selecciona Unidad:", unidades_opts)
+            btn_del = st.form_submit_button("🗑️ Eliminar Registro")
+            if btn_del:
+                eliminar_equipo(unidad_a_eliminar)
+                st.warning(f"❌ Unidad {unidad_a_eliminar} eliminada.")
+                st.rerun()
 
-if st.session_state.historial:
-    df_historial = pd.DataFrame(st.session_state.historial)
-    st.dataframe(df_historial, use_container_width=True)
+    st.markdown("---")
+    st.markdown(f"#### 📋 Catálogo en Vivo ({len(df_equipos)} Equipos)")
+    st.dataframe(df_equipos, use_container_width=True)
 
-    # Generar binario de Excel usando io.BytesIO
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        df_historial.to_excel(writer, index=False, sheet_name="Mediciones")
+    buffer_db = io.BytesIO()
+    with pd.ExcelWriter(buffer_db, engine="openpyxl") as writer:
+        df_equipos.to_excel(writer, index=False, sheet_name="Flota")
 
     st.download_button(
-        label="📊 Descargar Reporte en Excel (.xlsx)",
-        data=buffer.getvalue(),
-        file_name=f"reporte_tanque_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+        label="📥 Descargar Catálogo (.xlsx)",
+        data=buffer_db.getvalue(),
+        file_name="catalogo_equipos.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-
-# ==========================================
-# GRÁFICO ALTAIR
-# ==========================================
-st.markdown("---")
-st.markdown("### 📈 Curva de Capacidad")
-
-pt_x = val_input if modo == "Pulgadas ➔ Galones" else res_val
-pt_y = res_val if modo == "Pulgadas ➔ Galones" else val_input
-point_df = pd.DataFrame({"inches": [pt_x], "gallons": [pt_y]})
-
-line_chart = (
-    alt.Chart(df)
-    .mark_line(color="#38bdf8", strokeWidth=3)
-    .encode(
-        x=alt.X("inches:Q", title="Nivel (Pulgadas)"),
-        y=alt.Y("gallons:Q", title="Volumen (Galones)"),
-        tooltip=[
-            alt.Tooltip("inches:Q", format=".2f"),
-            alt.Tooltip("gallons:Q", format=",.2f"),
-        ],
-    )
-)
-
-point_chart = (
-    alt.Chart(point_df)
-    .mark_point(color="#f43f5e", size=200, filled=True)
-    .encode(x="inches:Q", y="gallons:Q")
-)
-
-chart = (line_chart + point_chart).properties(height=350).interactive()
-st.altair_chart(chart, use_container_width=True)
