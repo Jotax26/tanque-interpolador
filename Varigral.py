@@ -82,7 +82,7 @@ st.markdown(
 
 
 # ==========================================
-# OPTIMIZACIÓN: Carga e Interpolación Pre-calculada
+# Carga e Interpolación Pre-calculada
 # ==========================================
 @st.cache_resource
 def get_interpolators():
@@ -104,35 +104,18 @@ def get_interpolators():
     df["inches"] = df["Nivel (pulgadas fraccionarias)"].apply(parse_frac)
     df["gallons"] = df["Volumen lleno (galones estadounidenses)"]
 
-    # Pre-compilación de funciones de interpolación en memoria (Ultra-rápido)
     f_gallons_quad = interp1d(
-        df["inches"],
-        df["gallons"],
-        kind="quadratic",
-        bounds_error=False,
-        fill_value="extrapolate",
+        df["inches"], df["gallons"], kind="quadratic", bounds_error=False, fill_value="extrapolate"
     )
     f_gallons_lin = interp1d(
-        df["inches"],
-        df["gallons"],
-        kind="linear",
-        bounds_error=False,
-        fill_value="extrapolate",
+        df["inches"], df["gallons"], kind="linear", bounds_error=False, fill_value="extrapolate"
     )
 
     f_inches_quad = interp1d(
-        df["gallons"],
-        df["inches"],
-        kind="quadratic",
-        bounds_error=False,
-        fill_value="extrapolate",
+        df["gallons"], df["inches"], kind="quadratic", bounds_error=False, fill_value="extrapolate"
     )
     f_inches_lin = interp1d(
-        df["gallons"],
-        df["inches"],
-        kind="linear",
-        bounds_error=False,
-        fill_value="extrapolate",
+        df["gallons"], df["inches"], kind="linear", bounds_error=False, fill_value="extrapolate"
     )
 
     return df, f_gallons_quad, f_gallons_lin, f_inches_quad, f_inches_lin
@@ -143,7 +126,7 @@ max_inches = float(df["inches"].max())
 max_gallons = float(df["gallons"].max())
 
 # ==========================================
-# HERO HEADER
+# HEADER
 # ==========================================
 st.markdown(
     """
@@ -154,7 +137,7 @@ st.markdown(
                 <p style="color: #64748b; margin: 4px 0 0 0; font-size: 0.95rem;">Sistema Avanzado de Cubaje y Análisis de Tanques</p>
             </div>
             <div style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 99px; padding: 6px 16px;">
-                <span style="color: #38bdf8; font-size: 0.85rem; font-weight: 600;">● Engine Ready</span>
+                <span style="color: #38bdf8; font-size: 0.85rem; font-weight: 600;">● Online</span>
             </div>
         </div>
     </div>
@@ -163,15 +146,11 @@ st.markdown(
 )
 
 # ==========================================
-# SIDEBAR CONTROL
+# SIDEBAR
 # ==========================================
 st.sidebar.markdown("### ⚙️ Parámetros")
-modo = st.sidebar.radio(
-    "Modo de Operación:", ["Pulgadas ➔ Galones", "Galones ➔ Pulgadas"]
-)
-algoritmo = st.sidebar.selectbox(
-    "Algoritmo:", ["Cuadrático (Recomendado)", "Lineal", "Más Cercano"]
-)
+modo = st.sidebar.radio("Modo de Operación:", ["Pulgadas ➔ Galones", "Galones ➔ Pulgadas"])
+algoritmo = st.sidebar.selectbox("Algoritmo:", ["Cuadrático (Recomendado)", "Lineal", "Más Cercano"])
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📐 Capacidades")
@@ -187,55 +166,27 @@ if modo == "Pulgadas ➔ Galones":
     with col_in:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
         st.markdown("#### 📏 Entrada de Nivel")
-
-        fmt = st.radio(
-            "Formato:", ["Por Octavos", "Decimal Directo"], horizontal=True
-        )
+        fmt = st.radio("Formato:", ["Por Octavos", "Decimal Directo"], horizontal=True)
 
         if fmt == "Por Octavos":
             c1, c2 = st.columns(2)
             with c1:
-                p_entera = st.number_input(
-                    "Pulgadas:",
-                    min_value=0,
-                    max_value=int(max_inches),
-                    value=44,
-                )
+                p_entera = st.number_input("Pulgadas:", min_value=0, max_value=int(max_inches), value=44)
             with c2:
                 octavos_dict = {
-                    '0"': 0.0,
-                    '1/8"': 0.125,
-                    '1/4"': 0.25,
-                    '3/8"': 0.375,
-                    '1/2"': 0.5,
-                    '5/8"': 0.625,
-                    '3/4"': 0.75,
-                    '7/8"': 0.875,
+                    '0"': 0.0, '1/8"': 0.125, '1/4"': 0.25, '3/8"': 0.375,
+                    '1/2"': 0.5, '5/8"': 0.625, '3/4"': 0.75, '7/8"': 0.875,
                 }
-                p_frac_str = st.selectbox(
-                    "Octavo:", list(octavos_dict.keys()), index=3
-                )
+                p_frac_str = st.selectbox("Octavo:", list(octavos_dict.keys()), index=3)
                 p_frac = octavos_dict[p_frac_str]
 
             val_input = float(p_entera + p_frac)
-            readout = (
-                f'{p_entera} {p_frac_str}'
-                if p_frac_str != '0"'
-                else f'{p_entera}"'
-            )
+            readout = f'{p_entera} {p_frac_str}' if p_frac_str != '0"' else f'{p_entera}"'
         else:
-            val_input = st.slider(
-                "Nivel (in):",
-                0.0,
-                max_inches,
-                44.375,
-                step=0.0625,
-            )
+            val_input = st.slider("Nivel (in):", 0.0, max_inches, 44.375, step=0.0625)
             readout = f'{val_input:.3f}"'
-
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Cálculo Óptimo en O(1)
     if algoritmo == "Más Cercano":
         idx = (df["inches"] - val_input).abs().idxmin()
         res_val = float(df.loc[idx, "gallons"])
@@ -249,35 +200,34 @@ if modo == "Pulgadas ➔ Galones":
     with col_out:
         st.markdown(
             f"""
-            <div class="metric-card" style="border-color: rgba(56, 189, 248, 0.3); background: linear-gradient(145deg, rgba(15,23,42,0.9), rgba(14,165,233,0.1));">
+            <div class="metric-card" style="border-color: rgba(56, 189, 248, 0.3); background: linear-gradient(145deg, rgba(15,23,42,0.9), rgba(14,165,233,0.1)); margin-bottom: 20px;">
                 <div class="metric-label">Volumen Estimado</div>
                 <div class="metric-value">{res_val:,.2f} <span style="font-size: 1rem; color: #94a3b8;">GAL</span></div>
                 <div style="margin-top: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 10px; font-size: 0.9rem; color: #cbd5e1;">
                     📍 Nivel Medido: <b>{readout}</b> ({val_input:.3f} in)
                 </div>
             </div>
+            
+            <div style="text-align: center;">
+                <div style="width: 150px; height: 150px; border-radius: 50%; border: 4px solid #38bdf8; position: relative; overflow: hidden; margin: 0 auto; background: rgba(15,23,42,0.8); box-shadow: 0 0 20px rgba(56,189,248,0.2);">
+                    <div style="position: absolute; bottom: 0; left: 0; right: 0; height: {pct_lleno}%; background: linear-gradient(180deg, rgba(56,189,248,0.8) 0%, rgba(2,132,199,0.9) 100%); transition: height 0.5s ease-in-out;"></div>
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-weight: 800; font-size: 1.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
+                        {pct_lleno:.1f}%
+                    </div>
+                </div>
+                <div style="margin-top: 10px; color: #94a3b8; font-size: 0.85rem; font-weight: 600;">VISTA FRONTAL DEL TANQUE</div>
+            </div>
         """,
             unsafe_allow_html=True,
         )
-
-        st.markdown("##### 🛢️ Nivel de Llenado")
-        st.progress(pct_lleno / 100)
-        st.caption(f"Tanque al **{pct_lleno:.1f}%** de su capacidad total.")
 
 else:
     with col_in:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
         st.markdown("#### 🛢️ Entrada de Volumen")
-        val_input = st.number_input(
-            "Volumen (Galones):",
-            min_value=0.0,
-            max_value=max_gallons,
-            value=5000.0,
-            step=50.0,
-        )
+        val_input = st.number_input("Volumen (Galones):", min_value=0.0, max_value=max_gallons, value=5000.0, step=50.0)
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Cálculo Óptimo en O(1)
     if algoritmo == "Más Cercano":
         idx = (df["gallons"] - val_input).abs().idxmin()
         res_val = float(df.loc[idx, "inches"])
@@ -286,7 +236,6 @@ else:
     else:
         res_val = float(f_in_quad(val_input))
 
-    # Formateo a Octavos
     entero = int(res_val)
     resto = res_val - entero
     octavo = round(resto * 8)
@@ -304,30 +253,68 @@ else:
     with col_out:
         st.markdown(
             f"""
-            <div class="metric-card" style="border-color: rgba(129, 140, 248, 0.3); background: linear-gradient(145deg, rgba(15,23,42,0.9), rgba(129,140,248,0.1));">
+            <div class="metric-card" style="border-color: rgba(129, 140, 248, 0.3); background: linear-gradient(145deg, rgba(15,23,42,0.9), rgba(129,140,248,0.1)); margin-bottom: 20px;">
                 <div class="metric-label">Nivel de Vara Requerido</div>
                 <div class="metric-value" style="color: #818cf8;">{entero}{str_frac}"</div>
                 <div style="margin-top: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 10px; font-size: 0.9rem; color: #cbd5e1;">
                     📏 Valor Decimal Exacto: <b>{res_val:.4f} pulgadas</b>
                 </div>
             </div>
+            
+            <div style="text-align: center;">
+                <div style="width: 150px; height: 150px; border-radius: 50%; border: 4px solid #818cf8; position: relative; overflow: hidden; margin: 0 auto; background: rgba(15,23,42,0.8); box-shadow: 0 0 20px rgba(129,140,248,0.2);">
+                    <div style="position: absolute; bottom: 0; left: 0; right: 0; height: {pct_lleno}%; background: linear-gradient(180deg, rgba(129,140,248,0.8) 0%, rgba(79,70,229,0.9) 100%); transition: height 0.5s ease-in-out;"></div>
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-weight: 800; font-size: 1.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
+                        {pct_lleno:.1f}%
+                    </div>
+                </div>
+                <div style="margin-top: 10px; color: #94a3b8; font-size: 0.85rem; font-weight: 600;">VISTA FRONTAL DEL TANQUE</div>
+            </div>
         """,
             unsafe_allow_html=True,
         )
 
-        st.markdown("##### 🛢️ Nivel de Llenado")
-        st.progress(pct_lleno / 100)
-        st.caption(f"Tanque al **{pct_lleno:.1f}%** de su capacidad total.")
-
 # ==========================================
-# GRÁFICO ALTAIR (Cero dependencias extra)
+# HISTORIAL DE MEDICIONES
 # ==========================================
 st.markdown("---")
-st.markdown("### 📈 Curva de Comportamiento del Tanque")
+st.markdown("### 📋 Historial de Turno")
+
+if "historial" not in st.session_state:
+    st.session_state.historial = []
+
+col_btn1, col_btn2 = st.columns([1, 4])
+with col_btn1:
+    if st.button("💾 Guardar Medición", use_container_width=True):
+        registro = {
+            "Modo": modo,
+            "Nivel (Pulgadas)": round(val_input if modo == "Pulgadas ➔ Galones" else res_val, 3),
+            "Volumen (Galones)": round(res_val if modo == "Pulgadas ➔ Galones" else val_input, 2),
+            "Capacidad %": round(pct_lleno, 1)
+        }
+        st.session_state.historial.insert(0, registro)
+        st.toast("✅ Registro guardado exitosamente.")
+
+if st.session_state.historial:
+    df_historial = pd.DataFrame(st.session_state.historial)
+    st.dataframe(df_historial, use_container_width=True)
+    
+    csv_data = df_historial.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Descargar Reporte (CSV)",
+        data=csv_data,
+        file_name="reporte_tanque.csv",
+        mime="text/csv",
+    )
+
+# ==========================================
+# GRÁFICO ALTAIR
+# ==========================================
+st.markdown("---")
+st.markdown("### 📈 Curva de Capacidad")
 
 pt_x = val_input if modo == "Pulgadas ➔ Galones" else res_val
 pt_y = res_val if modo == "Pulgadas ➔ Galones" else val_input
-
 point_df = pd.DataFrame({"inches": [pt_x], "gallons": [pt_y]})
 
 line_chart = (
@@ -336,16 +323,13 @@ line_chart = (
     .encode(
         x=alt.X("inches:Q", title="Nivel (Pulgadas)"),
         y=alt.Y("gallons:Q", title="Volumen (Galones)"),
-        tooltip=[
-            alt.Tooltip("inches:Q", title="Nivel (in)", format=".2f"),
-            alt.Tooltip("gallons:Q", title="Volumen (Gal)", format=",.2f"),
-        ],
+        tooltip=[alt.Tooltip("inches:Q", format=".2f"), alt.Tooltip("gallons:Q", format=",.2f")],
     )
 )
 
 point_chart = (
     alt.Chart(point_df)
-    .mark_point(color="#f43f5e", size=150, filled=True)
+    .mark_point(color="#f43f5e", size=200, filled=True)
     .encode(x="inches:Q", y="gallons:Q")
 )
 
