@@ -5,6 +5,7 @@ from datetime import datetime
 import altair as alt
 import numpy as np
 import pandas as pd
+import pytz
 from scipy.interpolate import interp1d
 import streamlit as st
 from supabase import create_client
@@ -89,8 +90,8 @@ st.markdown(
 # ==========================================
 # CONEXIÓN A SUPABASE Y DATOS INICIALES
 # ==========================================
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 
 @st.cache_resource
 def init_supabase():
@@ -173,7 +174,7 @@ def obtener_equipos():
 
 def obtener_fuleos():
     try:
-        res = supabase.table("fuleos").select("*").order("created_at", desc=True).execute()
+        res = supabase.table("fuleos").select("*").order("fecha_hora", desc=True).execute()
         return pd.DataFrame(res.data)
     except Exception as e:
         st.error(f"⚠️ Error al conectar con Supabase (fuleos): {e}")
@@ -182,25 +183,47 @@ def obtener_fuleos():
 def guardar_fuleo(datos):
     try:
         supabase.table("fuleos").insert(datos).execute()
+        return True
     except Exception as e:
         st.error(f"Error al guardar fuleo: {e}")
+        return False
+
+def actualizar_fuleo(record_id, datos):
+    try:
+        supabase.table("fuleos").update(datos).eq("id", record_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error al actualizar fuleo: {e}")
+        return False
+
+def eliminar_fuleo(record_id):
+    try:
+        supabase.table("fuleos").delete().eq("id", record_id).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error al eliminar fuleo: {e}")
+        return False
 
 def agregar_equipo(datos):
     try:
         supabase.table("equipos").insert(datos).execute()
+        return True
     except Exception as e:
         st.error(f"Error al agregar equipo: {e}")
+        return False
 
 def eliminar_equipo(unidad):
     try:
         supabase.table("equipos").delete().eq("UNIDAD", unidad).execute()
+        return True
     except Exception as e:
         st.error(f"Error al eliminar equipo: {e}")
+        return False
 
 # ==========================================
 # INTERPOLACIÓN Y TABLA DE CUBAJE
 # ==========================================
-@st.cache_resource
+@st.cache_data
 def get_interpolators():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(base_dir, "tank-dip-chart-hCylinder.csv")
@@ -262,7 +285,7 @@ st.markdown(
 tab1, tab2, tab3 = st.tabs(["📏 Cubaje de Tanque", "⛽ Registrar Fuleo (Nube)", "🚛 Gestión de Flota"])
 
 # ==========================================
-# PESTAÑA 1: CUBAJE (ENTRADA DIRECTA SIN SLIDERS)
+# PESTAÑA 1: CUBAJE
 # ==========================================
 with tab1:
     modo = st.radio(
@@ -293,13 +316,11 @@ with tab1:
                 frac_str = st.selectbox(
                     "Fracción (Octavos):",
                     list(FRACCIONES_OCTAVOS.keys()),
-                    index=3, # Por defecto 3/8
+                    index=3,
                     key="fraccion_inp"
                 )
 
-            # Suma de la medición exacta ingresada
             nivel_final_in = pulgadas_enteras + FRACCIONES_OCTAVOS[frac_str]
-
             galones_calc = float(f_gal_quad(nivel_final_in))
             porcentaje = (galones_calc / max_gallons) * 100
 
@@ -343,7 +364,6 @@ with tab1:
                 unsafe_allow_html=True
             )
 
-        # Gráfica interactiva de nivel
         st.markdown("---")
         st.markdown("#### 📈 Nivel del Tanque en Tiempo Real")
         df_chart = df_tanque.copy()
@@ -363,7 +383,6 @@ with tab1:
         st.altair_chart((chart + point_chart).properties(width="container", height=280), use_container_width=True)
 
     else:
-        # Modo Galones -> Pulgadas
         with col_inputs:
             st.markdown("### 🛢️ Ingresar Galones Objetivo")
             
@@ -380,7 +399,6 @@ with tab1:
             inches_calc = float(f_in_quad(galones_final))
             porcentaje = (galones_final / max_gallons) * 100
 
-            # Desglose de pulgadas calculadas expresadas en OCTAVOS
             pulg_int = int(inches_calc)
             pulg_dec = inches_calc - pulg_int
             frac_8 = round(pulg_dec * 8)
@@ -413,7 +431,6 @@ with tab1:
                 unsafe_allow_html=True
             )
 
-        # Gráfica interactiva de curva
         st.markdown("---")
         st.markdown("#### 📈 Nivel del Tanque en Tiempo Real")
         df_chart = df_tanque.copy()
@@ -433,7 +450,7 @@ with tab1:
         st.altair_chart((chart + point_chart).properties(width="container", height=280), use_container_width=True)
 
 # ==========================================
-# PESTAÑA 2: REGISTRO DE FULEO EN SUPABASE
+# PESTAÑA 2: REGISTRO DE FULEO
 # ==========================================
 with tab2:
     st.markdown("### 🛢️ Registrar Dispensación de Combustible")
@@ -442,7 +459,7 @@ with tab2:
     with st.form("form_fuleo_supabase"):
         c1, c2, c3 = st.columns(3)
         with c1:
-            unidad_sel = st.selectbox("Unidad:", unidades_opts, key="fuleo_unidad")
+            unidad_sel = st.selectbox("Unidad:", unidades_opts, key="fuleo_unidad") if unidades_opts else st.text_input("Unidad:")
             bomba = st.selectbox("Bomba:", ["Bomba Negra", "Bomba Verde"], key="fuleo_bomba")
 
         with c2:
@@ -462,37 +479,108 @@ with tab2:
         elif not unidad_sel:
             st.error("Error: Debe seleccionar una unidad.")
         else:
-            eq_row = df_equipos[df_equipos["UNIDAD"] == unidad_sel].iloc[0]
+            eq_matches = df_equipos[df_equipos["UNIDAD"] == unidad_sel]
+            placa = str(eq_matches.iloc[0]["PLACA"]) if not eq_matches.empty else "N/A"
+            marca = str(eq_matches.iloc[0]["MARCA"]) if not eq_matches.empty else "N/A"
+            
+            tz_local = pytz.timezone("America/El_Salvador")
+            fecha_local = datetime.now(tz_local).strftime("%Y-%m-%d %H:%M:%S")
+
             registro = {
-                "fecha_hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "fecha_hora": fecha_local,
                 "unidad": unidad_sel,
-                "placa": str(eq_row["PLACA"]),
-                "marca": str(eq_row["MARCA"]),
+                "placa": placa,
+                "marca": marca,
                 "bomba": bomba,
                 "contador_inicial": float(val_inicial),
                 "contador_final": float(val_final),
                 "galones_dispensados": round(float(despachado), 2),
                 "operador": operador,
             }
-            guardar_fuleo(registro)
-            st.success(f"✅ Fuleo guardado exitosamente para {unidad_sel} ({despachado:.2f} Gal).")
+            if guardar_fuleo(registro):
+                st.success(f"✅ Fuleo guardado exitosamente a las {fecha_local} para {unidad_sel} ({despachado:.2f} Gal).")
+                st.rerun()
 
     st.markdown("---")
     st.markdown("### 📊 Registros Guardados en Supabase")
     df_fuleos = obtener_fuleos()
-    if not df_fuleos.empty:
-        st.dataframe(df_fuleos, use_container_width=True)
-        buffer_fuleo = io.BytesIO()
-        with pd.ExcelWriter(buffer_fuleo, engine="openpyxl") as writer:
-            df_fuleos.to_excel(writer, index=False, sheet_name="Fuleos_Supabase")
 
-        st.download_button(
-            label="📊 Descargar Reporte en Excel (.xlsx)",
-            data=buffer_fuleo.getvalue(),
-            file_name=f"historial_fuleos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            key="btn_down_fuleos"
-        )
+    if not df_fuleos.empty:
+        subtab_ver, subtab_gestionar = st.tabs(["📋 Ver Registros", "⚙️ Modificar o Eliminar Registro"])
+
+        with subtab_ver:
+            st.dataframe(df_fuleos, use_container_width=True)
+            
+            buffer_fuleo = io.BytesIO()
+            with pd.ExcelWriter(buffer_fuleo, engine="openpyxl") as writer:
+                df_fuleos.to_excel(writer, index=False, sheet_name="Fuleos_Supabase")
+
+            st.download_button(
+                label="📊 Descargar Reporte en Excel (.xlsx)",
+                data=buffer_fuleo.getvalue(),
+                file_name=f"historial_fuleos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="btn_down_fuleos"
+            )
+
+        with subtab_gestionar:
+            st.markdown("#### 🛠️ Modificar / Eliminar un Fuleo Existente")
+            
+            opciones_fuleos = {
+                f"ID {row['id']} | {row['fecha_hora']} | Unidad: {row['unidad']} | {row['galones_dispensados']} Gal": row['id']
+                for _, row in df_fuleos.iterrows()
+            }
+            
+            opcion_sel = st.selectbox("Seleccione el registro a modificar:", list(opciones_fuleos.keys()))
+            id_seleccionado = opciones_fuleos[opcion_sel]
+            row_edit = df_fuleos[df_fuleos['id'] == id_seleccionado].iloc[0]
+
+            col_mod, col_del = st.columns([2, 1], gap="large")
+
+            with col_mod:
+                st.markdown("##### ✏️ Editar Datos")
+                with st.form(f"form_edit_fuleo_{id_seleccionado}"):
+                    index_u = unidades_opts.index(row_edit['unidad']) if row_edit['unidad'] in unidades_opts else 0
+                    e_unidad = st.selectbox("Unidad:", unidades_opts, index=index_u) if unidades_opts else st.text_input("Unidad:", value=row_edit['unidad'])
+                    e_bomba = st.selectbox("Bomba:", ["Bomba Negra", "Bomba Verde"], index=0 if row_edit['bomba'] == "Bomba Negra" else 1)
+                    e_inicial = st.number_input("Contador Inicial:", value=float(row_edit['contador_inicial']), step=0.1)
+                    e_final = st.number_input("Contador Final:", value=float(row_edit['contador_final']), step=0.1)
+                    e_operador = st.text_input("Operador:", value=str(row_edit['operador'] or ""))
+                    
+                    e_despachado = max(0.0, e_final - e_inicial)
+                    st.text(f"Nuevo Cálculo: {e_despachado:,.2f} Gal")
+                    
+                    btn_guardar_edit = st.form_submit_button("💾 Guardar Cambios")
+
+                if btn_guardar_edit:
+                    if e_final <= e_inicial:
+                        st.error("Error: El contador final debe ser mayor al inicial.")
+                    else:
+                        eq_r = df_equipos[df_equipos["UNIDAD"] == e_unidad]
+                        placa_edit = str(eq_r.iloc[0]["PLACA"]) if not eq_r.empty else "N/A"
+                        marca_edit = str(eq_r.iloc[0]["MARCA"]) if not eq_r.empty else "N/A"
+
+                        datos_act = {
+                            "unidad": e_unidad,
+                            "placa": placa_edit,
+                            "marca": marca_edit,
+                            "bomba": e_bomba,
+                            "contador_inicial": float(e_inicial),
+                            "contador_final": float(e_final),
+                            "galones_dispensados": round(float(e_despachado), 2),
+                            "operador": e_operador,
+                        }
+                        if actualizar_fuleo(id_seleccionado, datos_act):
+                            st.success(f"✅ Registro ID {id_seleccionado} actualizado correctamente.")
+                            st.rerun()
+
+            with col_del:
+                st.markdown("##### 🗑️ Eliminar Registro")
+                st.warning("⚠️ Esta acción es irreversible.")
+                if st.button(f"❌ Eliminar Registro ID {id_seleccionado}", use_container_width=True):
+                    if eliminar_fuleo(id_seleccionado):
+                        st.success(f"🗑️ Registro ID {id_seleccionado} eliminado exitosamente.")
+                        st.rerun()
     else:
         st.info("No hay registros de fuleo en la base de datos.")
 
@@ -516,23 +604,28 @@ with tab3:
             if not nueva_unidad or not nueva_placa:
                 st.error("Error: Completa los campos requeridos.")
             else:
-                agregar_equipo({
+                if agregar_equipo({
                     "UNIDAD": nueva_unidad,
                     "PLACA": nueva_placa,
                     "AÑO": int(nuevo_ano),
                     "MARCA": nueva_marca
-                })
-                st.success(f"✅ Unidad {nueva_unidad} agregada.")
+                }):
+                    st.success(f"✅ Unidad {nueva_unidad} agregada.")
+                    st.rerun()
 
     with col_del:
         st.markdown("#### 🗑️ Eliminar Equipo")
-        with st.form("form_del_eq"):
-            unidad_a_eliminar = st.selectbox("Selecciona Unidad:", unidades_opts, key="del_u")
-            btn_del = st.form_submit_button("🗑️ Eliminar Registro")
+        if unidades_opts:
+            with st.form("form_del_eq"):
+                unidad_a_eliminar = st.selectbox("Selecciona Unidad:", unidades_opts, key="del_u")
+                btn_del = st.form_submit_button("🗑️ Eliminar Registro")
 
-        if btn_del:
-            eliminar_equipo(unidad_a_eliminar)
-            st.warning(f"❌ Unidad {unidad_a_eliminar} eliminada.")
+            if btn_del:
+                if eliminar_equipo(unidad_a_eliminar):
+                    st.warning(f"❌ Unidad {unidad_a_eliminar} eliminada.")
+                    st.rerun()
+        else:
+            st.info("No hay unidades registradas para eliminar.")
 
     st.markdown("---")
     st.markdown(f"#### 📋 Catálogo en Vivo ({len(df_equipos)} Equipos)")
