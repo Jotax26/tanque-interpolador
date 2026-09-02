@@ -2,10 +2,10 @@ import io
 import math
 import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import altair as alt
 import numpy as np
 import pandas as pd
-import pytz
 from scipy.interpolate import interp1d
 import streamlit as st
 from supabase import create_client
@@ -454,56 +454,72 @@ with tab1:
 # ==========================================
 with tab2:
     st.markdown("### 🛢️ Registrar Dispensación de Combustible")
+    
+    df_fuleos = obtener_fuleos()
     unidades_opts = df_equipos["UNIDAD"].tolist() if not df_equipos.empty else []
 
+    col_sel1, col_sel2 = st.columns(2)
+    with col_sel1:
+        bomba_seleccionada = st.selectbox("Bomba:", ["Bomba Negra", "Bomba Verde"], key="fuleo_bomba_sel")
+    with col_sel2:
+        unidad_sel = st.selectbox("Unidad:", unidades_opts, key="fuleo_unidad_sel") if unidades_opts else st.text_input("Unidad:")
+
+    # Obtener el contador final previo según la bomba seleccionada
+    ultimo_contador_inicial = 0.0
+    if not df_fuleos.empty and "bomba" in df_fuleos.columns:
+        fuleos_bomba = df_fuleos[df_fuleos["bomba"] == bomba_seleccionada]
+        if not fuleos_bomba.empty:
+            ultimo_contador_inicial = float(fuleos_bomba.iloc[0]["contador_final"])
+
     with st.form("form_fuleo_supabase"):
-        c1, c2, c3 = st.columns(3)
+        c1, c2 = st.columns(2)
         with c1:
-            unidad_sel = st.selectbox("Unidad:", unidades_opts, key="fuleo_unidad") if unidades_opts else st.text_input("Unidad:")
-            bomba = st.selectbox("Bomba:", ["Bomba Negra", "Bomba Verde"], key="fuleo_bomba")
+            val_inicial = st.number_input(
+                f"Contador Inicial ({bomba_seleccionada}):", 
+                value=ultimo_contador_inicial, 
+                min_value=0.0, 
+                step=0.1, 
+                format="%.2f", 
+                key="fuleo_init"
+            )
+            val_final = st.number_input("Contador Final (Gal):", min_value=val_inicial, step=0.1, format="%.2f", key="fuleo_fin")
 
         with c2:
-            val_inicial = st.number_input("Contador Inicial (Gal):", min_value=0.0, step=0.1, format="%.2f", key="fuleo_init")
-            val_final = st.number_input("Contador Final (Gal):", min_value=0.0, step=0.1, format="%.2f", key="fuleo_fin")
-
-        with c3:
-            operador = st.text_input("Operador/Despachador:", key="fuleo_op")
+            operador = st.text_input("Operador / Despachador:", key="fuleo_op")
             despachado = max(0.0, val_final - val_inicial)
-            st.text(f"Galones Aprox: {despachado:,.2f} Gal")
+            st.markdown(f"**Galones Aprox. a Dispensar:** `{despachado:,.2f} GAL`")
 
         submitted = st.form_submit_button("💾 Guardar Fuleo en Supabase", use_container_width=True)
 
     if submitted:
         if val_final <= val_inicial:
-            st.error("Error: El contador final debe ser mayor que el inicial.")
+            st.error("⚠️ Error: El contador final debe ser mayor que el contador inicial.")
         elif not unidad_sel:
-            st.error("Error: Debe seleccionar una unidad.")
+            st.error("⚠️ Error: Debe seleccionar una unidad válida.")
         else:
             eq_matches = df_equipos[df_equipos["UNIDAD"] == unidad_sel]
             placa = str(eq_matches.iloc[0]["PLACA"]) if not eq_matches.empty else "N/A"
             marca = str(eq_matches.iloc[0]["MARCA"]) if not eq_matches.empty else "N/A"
             
-            tz_local = pytz.timezone("America/El_Salvador")
-            fecha_local = datetime.now(tz_local).strftime("%Y-%m-%d %H:%M:%S")
+            fecha_local = datetime.now(ZoneInfo("America/El_Salvador")).strftime("%Y-%m-%d %H:%M:%S")
 
             registro = {
                 "fecha_hora": fecha_local,
                 "unidad": unidad_sel,
                 "placa": placa,
                 "marca": marca,
-                "bomba": bomba,
+                "bomba": bomba_seleccionada,
                 "contador_inicial": float(val_inicial),
                 "contador_final": float(val_final),
                 "galones_dispensados": round(float(despachado), 2),
                 "operador": operador,
             }
             if guardar_fuleo(registro):
-                st.success(f"✅ Fuleo guardado exitosamente a las {fecha_local} para {unidad_sel} ({despachado:.2f} Gal).")
+                st.success(f"✅ Fuleo de {despachado:.2f} Gal guardado correctamente para {unidad_sel} en {bomba_seleccionada}.")
                 st.rerun()
 
     st.markdown("---")
-    st.markdown("### 📊 Registros Guardados en Supabase")
-    df_fuleos = obtener_fuleos()
+    st.markdown("### 📊 Historial y Gestión de Registros")
 
     if not df_fuleos.empty:
         subtab_ver, subtab_gestionar = st.tabs(["📋 Ver Registros", "⚙️ Modificar o Eliminar Registro"])
@@ -524,21 +540,21 @@ with tab2:
             )
 
         with subtab_gestionar:
-            st.markdown("#### 🛠️ Modificar / Eliminar un Fuleo Existente")
+            st.markdown("#### 🛠️ Modificar / Eliminar un Fuleo Registrado")
             
             opciones_fuleos = {
-                f"ID {row['id']} | {row['fecha_hora']} | Unidad: {row['unidad']} | {row['galones_dispensados']} Gal": row['id']
+                f"ID {row['id']} | {row['fecha_hora']} | {row['bomba']} | Unidad: {row['unidad']} | {row['galones_dispensados']} Gal": row['id']
                 for _, row in df_fuleos.iterrows()
             }
             
-            opcion_sel = st.selectbox("Seleccione el registro a modificar:", list(opciones_fuleos.keys()))
+            opcion_sel = st.selectbox("Seleccione el registro a editar/eliminar:", list(opciones_fuleos.keys()))
             id_seleccionado = opciones_fuleos[opcion_sel]
             row_edit = df_fuleos[df_fuleos['id'] == id_seleccionado].iloc[0]
 
             col_mod, col_del = st.columns([2, 1], gap="large")
 
             with col_mod:
-                st.markdown("##### ✏️ Editar Datos")
+                st.markdown("##### ✏️ Modificar Datos")
                 with st.form(f"form_edit_fuleo_{id_seleccionado}"):
                     index_u = unidades_opts.index(row_edit['unidad']) if row_edit['unidad'] in unidades_opts else 0
                     e_unidad = st.selectbox("Unidad:", unidades_opts, index=index_u) if unidades_opts else st.text_input("Unidad:", value=row_edit['unidad'])
@@ -548,13 +564,13 @@ with tab2:
                     e_operador = st.text_input("Operador:", value=str(row_edit['operador'] or ""))
                     
                     e_despachado = max(0.0, e_final - e_inicial)
-                    st.text(f"Nuevo Cálculo: {e_despachado:,.2f} Gal")
+                    st.markdown(f"**Nuevo Total Calculado:** `{e_despachado:,.2f} GAL`")
                     
                     btn_guardar_edit = st.form_submit_button("💾 Guardar Cambios")
 
                 if btn_guardar_edit:
                     if e_final <= e_inicial:
-                        st.error("Error: El contador final debe ser mayor al inicial.")
+                        st.error("⚠️ Error: El contador final debe ser mayor al inicial.")
                     else:
                         eq_r = df_equipos[df_equipos["UNIDAD"] == e_unidad]
                         placa_edit = str(eq_r.iloc[0]["PLACA"]) if not eq_r.empty else "N/A"
@@ -571,18 +587,18 @@ with tab2:
                             "operador": e_operador,
                         }
                         if actualizar_fuleo(id_seleccionado, datos_act):
-                            st.success(f"✅ Registro ID {id_seleccionado} actualizado correctamente.")
+                            st.success(f"✅ Registro ID {id_seleccionado} actualizado en Supabase.")
                             st.rerun()
 
             with col_del:
                 st.markdown("##### 🗑️ Eliminar Registro")
-                st.warning("⚠️ Esta acción es irreversible.")
+                st.warning("⚠️ Esta acción es permanente en la base de datos.")
                 if st.button(f"❌ Eliminar Registro ID {id_seleccionado}", use_container_width=True):
                     if eliminar_fuleo(id_seleccionado):
                         st.success(f"🗑️ Registro ID {id_seleccionado} eliminado exitosamente.")
                         st.rerun()
     else:
-        st.info("No hay registros de fuleo en la base de datos.")
+        st.info("No hay registros de fuleo almacenados en la base de datos.")
 
 # ==========================================
 # PESTAÑA 3: FLOTA EN SUPABASE
