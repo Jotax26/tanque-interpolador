@@ -262,7 +262,7 @@ st.markdown(
 tab1, tab2, tab3 = st.tabs(["📏 Cubaje de Tanque", "⛽ Registrar Fuleo (Nube)", "🚛 Gestión de Flota"])
 
 # ==========================================
-# PESTAÑA 1: CUBAJE CON MEDIDAS EN OCTAVOS
+# PESTAÑA 1: CUBAJE (ENTRADA DIRECTA SIN SLIDERS)
 # ==========================================
 with tab1:
     modo = st.radio(
@@ -277,9 +277,8 @@ with tab1:
 
     if modo == "Pulgadas ➔ Galones":
         with col_inputs:
-            st.markdown("### 📐 Selección de Medición (Varilla en Octavos)")
+            st.markdown("### 📐 Ingresar Medición de la Varilla")
 
-            # Fila de Pulgadas Enteras + Fracciones en Octavos
             col_ent, col_frac = st.columns(2)
             with col_ent:
                 pulgadas_enteras = st.number_input(
@@ -298,19 +297,8 @@ with tab1:
                     key="fraccion_inp"
                 )
 
-            # Cálculo de la suma decimal
-            pulgadas_totales = pulgadas_enteras + FRACCIONES_OCTAVOS[frac_str]
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            # Slider ajustado en pasos de 1/8 (0.125)
-            nivel_final_in = st.slider(
-                "Ajuste Deslizante (Pulgadas Decimales):",
-                min_value=0.0,
-                max_value=max_inches,
-                value=float(pulgadas_totales),
-                step=0.125,
-                key="slider_pulgadas_fino"
-            )
+            # Suma de la medición exacta ingresada
+            nivel_final_in = pulgadas_enteras + FRACCIONES_OCTAVOS[frac_str]
 
             galones_calc = float(f_gal_quad(nivel_final_in))
             porcentaje = (galones_calc / max_gallons) * 100
@@ -321,9 +309,9 @@ with tab1:
             st.markdown(
                 f"""
                 <div class="metric-card">
-                    <div class="metric-label">Lectura Seleccionada</div>
+                    <div class="metric-label">Lectura Ingresada</div>
                     <div class="metric-value" style="color: #818cf8;">{nivel_final_in:.3f}"</div>
-                    <div class="metric-sub">Pulgadas Enteras + Octavos</div>
+                    <div class="metric-sub">{pulgadas_enteras} in + {frac_str}</div>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -377,24 +365,16 @@ with tab1:
     else:
         # Modo Galones -> Pulgadas
         with col_inputs:
-            st.markdown("### 🛢️ Entrada de Galones Objetivo")
+            st.markdown("### 🛢️ Ingresar Galones Objetivo")
             
-            galones_input = st.number_input(
-                "Ingresa Galones:",
+            galones_final = st.number_input(
+                "Cantidad de Galones:",
                 min_value=0.0,
                 max_value=max_gallons,
                 value=5000.0,
-                step=50.0,
-                key="num_galones_directo"
-            )
-
-            galones_final = st.slider(
-                "Ajuste Deslizante de Galones:",
-                min_value=0.0,
-                max_value=max_gallons,
-                value=float(galones_input),
                 step=10.0,
-                key="slider_galones_directo"
+                format="%.2f",
+                key="num_galones_directo"
             )
 
             inches_calc = float(f_in_quad(galones_final))
